@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Row, Col, Card } from 'react-bootstrap';
+import {GoogleLogin} from "@react-oauth/google";
+import {useGoogleSuccess} from "../auth/google/use-google-auth";
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  const {responseMessage, errorMessage} = useGoogleSuccess();
+
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -80,9 +85,8 @@ function Login() {
                     </a>
                   </div>
 
-                  <Button variant="outline-primary" className="w-100 mt-3 py-2">
-                    Login with Google
-                  </Button>
+                  {/* Google Login Button */}
+                  <GoogleLogin onSuccess={responseMessage} onError={errorMessage} />
                 </Form>
               </Card.Body>
             </Card>

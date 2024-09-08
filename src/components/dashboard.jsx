@@ -3,29 +3,29 @@ import { Container, Row, Col, Card, Button, Form, Modal } from 'react-bootstrap'
 import axios from 'axios';
 
 // Reusable Task Card Component
-function TaskCard({ task, onEdit, onView }) {
+function TaskCard({ task, onEdit, onView, onDelete }) {
   const createdAtDate = new Date(task.created_at);
 
-   // Format the date in YYYY/MM/DD
-   const formattedDate = createdAtDate.toLocaleDateString('en-GB').split('/').reverse().join('/');
+  // Format the date in YYYY/MM/DD
+  const formattedDate = createdAtDate.toLocaleDateString('en-GB').split('/').reverse().join('/');
 
-   // Convert time to IST (Indian Standard Time)
-   const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' };
-   const formattedTime = createdAtDate.toLocaleTimeString('en-US', options);
+  // Convert time to IST (Indian Standard Time)
+  const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' };
+  const formattedTime = createdAtDate.toLocaleTimeString('en-US', options);
 
   return (
-    <Card className="mb-3 shadow-sm">
-      <Card.Body>
-        <Card.Title>{task.title}</Card.Title>
-        <Card.Text>{task.description}</Card.Text>
-        <Card.Text>
-          <small className="text-muted">Created at {formattedDate} {formattedTime}</small>
-        </Card.Text>
-        <Button variant="danger" className="me-2">Delete</Button>
-        <Button variant="primary" className="me-2" onClick={() => onEdit(task)}>Edit</Button>
-        <Button variant="secondary" onClick={() => onView(task)}>View Details</Button>
-      </Card.Body>
-    </Card>
+      <Card className="mb-3 shadow-sm">
+        <Card.Body>
+          <Card.Title>{task.title}</Card.Title>
+          <Card.Text>{task.description}</Card.Text>
+          <Card.Text>
+            <small className="text-muted">Created at {formattedDate} {formattedTime}</small>
+          </Card.Text>
+          <Button variant="danger" className="me-2" onClick={() => onDelete(task)}>Delete</Button>
+          <Button variant="primary" className="me-2" onClick={() => onEdit(task)}>Edit</Button>
+          <Button variant="secondary" onClick={() => onView(task)}>View Details</Button>
+        </Card.Body>
+      </Card>
   );
 }
 
@@ -33,9 +33,11 @@ function Dashboard() {
   const [showModal, setShowModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', description: '' });
   const [currentTask, setCurrentTask] = useState(null); // For edit and view modals
   const [tasks, setTasks] = useState({ todo: [], inProgress: [], done: [] });
+  const [taskToDelete, setTaskToDelete] = useState(null); // For delete confirmation modal
 
   // Retrieve token from local storage
   const token = localStorage.getItem('token');
@@ -52,9 +54,9 @@ function Dashboard() {
 
         // Categorize tasks based on status
         const categorizedTasks = {
-          todo: allTasks.filter(task => task.status === 1),
-          inProgress: allTasks.filter(task => task.status === 2),
-          done: allTasks.filter(task => task.status === 3)
+          todo: allTasks.filter(task => task.status_id === 1),
+          inProgress: allTasks.filter(task => task.status_id === 2),
+          done: allTasks.filter(task => task.status_id === 3)
         };
 
         setTasks(categorizedTasks);
@@ -85,11 +87,11 @@ function Dashboard() {
 
       // Assuming your API returns the created task with a status
       const updatedTasks = { ...tasks };
-      if (createdTask.status === 1) {
+      if (createdTask.status_id === 1) {
         updatedTasks.todo = [createdTask, ...updatedTasks.todo];
-      } else if (createdTask.status === 2) {
+      } else if (createdTask.status_id === 2) {
         updatedTasks.inProgress = [createdTask, ...updatedTasks.inProgress];
-      } else if (createdTask.status === 3) {
+      } else if (createdTask.status_id === 3) {
         updatedTasks.done = [createdTask, ...updatedTasks.done];
       }
 
@@ -122,13 +124,13 @@ function Dashboard() {
       });
       const updatedTask = response.data;
 
-      // Update the tasks list
+      // Update the task list
       const updatedTasks = { ...tasks };
-      if (updatedTask.status === 1) {
+      if (updatedTask.status_id === 1) {
         updatedTasks.todo = updatedTasks.todo.map(task => task.id === updatedTask.id ? updatedTask : task);
-      } else if (updatedTask.status === 2) {
+      } else if (updatedTask.status_id === 2) {
         updatedTasks.inProgress = updatedTasks.inProgress.map(task => task.id === updatedTask.id ? updatedTask : task);
-      } else if (updatedTask.status === 3) {
+      } else if (updatedTask.status_id === 3) {
         updatedTasks.done = updatedTasks.done.map(task => task.id === updatedTask.id ? updatedTask : task);
       }
 
@@ -139,88 +141,105 @@ function Dashboard() {
     }
   };
 
+  const handleDeleteTask = (task) => {
+    setTaskToDelete(task);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await axios.delete(`http://localhost:8080/api/tasks/${taskToDelete.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      // Remove the deleted task from the list
+      const updatedTasks = { ...tasks };
+      if (taskToDelete.status_id === 1) {
+        updatedTasks.todo = updatedTasks.todo.filter(task => task.id !== taskToDelete.id);
+      } else if (taskToDelete.status_id === 2) {
+        updatedTasks.inProgress = updatedTasks.inProgress.filter(task => task.id !== taskToDelete.id);
+      } else if (taskToDelete.status_id === 3) {
+        updatedTasks.done = updatedTasks.done.filter(task => task.id !== taskToDelete.id);
+      }
+
+      setTasks(updatedTasks);
+      setTaskToDelete(null);
+      setShowDeleteModal(false);
+    } catch (error) {
+      console.error('Error deleting task:', error);
+    }
+  };
+
+  const handleCloseDeleteModal = () => {
+    setTaskToDelete(null);
+    setShowDeleteModal(false);
+  };
+
   return (
-    <Container fluid>
-      <Row className="mb-4">
-        <Col>
-          <Button variant="primary" className="mb-2" onClick={handleShowModal}>Add Task</Button>
-          <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" />
-        </Col>
-        <Col className="text-end">
-          <Form.Select className="d-inline-block w-auto">
-            <option value="recent">Sort By: Recent</option>
-            <option value="oldest">Sort By: Oldest</option>
-          </Form.Select>
-        </Col>
-      </Row>
-      <Row>
-        {/* TODO Column */}
-        <Col md={4}>
-          <h5 className="mb-4">TODO</h5>
-          {tasks.todo.map(task => (
-            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
-          ))}
-        </Col>
+      <Container fluid>
+        <Row className="mb-4">
+          <Col>
+            <Button variant="primary" className="mb-2" onClick={handleShowModal}>Add Task</Button>
+            <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" />
+          </Col>
+          <Col className="text-end">
+            <Form.Select className="d-inline-block w-auto">
+              <option value="recent">Sort By: Recent</option>
+              <option value="oldest">Sort By: Oldest</option>
+            </Form.Select>
+          </Col>
+        </Row>
+        <Row>
+          <Col md={4}>
+            <h5 className="mb-4">TODO</h5>
+            {tasks.todo.map(task => (
+                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
+            ))}
+          </Col>
 
-        {/* IN PROGRESS Column */}
-        <Col md={4}>
-          <h5 className="mb-4">IN PROGRESS</h5>
-          {tasks.inProgress.map(task => (
-            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
-          ))}
-        </Col>
+          {/* IN PROGRESS Column */}
+          <Col md={4}>
+            <h5 className="mb-4">IN PROGRESS</h5>
+            {tasks.inProgress.map(task => (
+                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
+            ))}
+          </Col>
 
-        {/* DONE Column */}
-        <Col md={4}>
-          <h5 className="mb-4">DONE</h5>
-          {tasks.done.map(task => (
-            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
-          ))}
-        </Col>
-      </Row>
+          {/* DONE Column */}
+          <Col md={4}>
+            <h5 className="mb-4">DONE</h5>
+            {tasks.done.map(task => (
+                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
+            ))}
+          </Col>
+        </Row>
 
-      {/* Add Task Modal */}
-      <Modal show={showModal} onHide={handleCloseModal}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Task</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group controlId="taskTitle">
-              <Form.Label>Title</Form.Label>
-              <Form.Control
-                type="text"
-                name="title"
-                placeholder="Enter task title"
-                value={newTask.title}
-                onChange={handleInputChange}
-              />
-            </Form.Group>
-            <Form.Group controlId="taskDescription" className="mt-3">
-              <Form.Label>Description</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                name="description"
-                placeholder="Enter task description"
-                value={newTask.description}
-                onChange={handleInputChange}
-              />
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            Close
-          </Button>
-          <Button variant="primary" onClick={handleSaveTask}>
-            Save Task
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        {/* Add Task Modal */}
+        <Modal show={showModal} onHide={handleCloseModal}>
+          <Modal.Header closeButton>
+            <Modal.Title>Add New Task</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Form.Group controlId="taskTitle">
+                <Form.Label>Title</Form.Label>
+                <Form.Control type="text" name="title" value={newTask.title} onChange={handleInputChange} />
+              </Form.Group>
+              <Form.Group controlId="taskDescription" className="mt-2">
+                <Form.Label>Description</Form.Label>
+                <Form.Control as="textarea" rows={3} name="description" value={newTask.description} onChange={handleInputChange} />
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseModal}>Close</Button>
+            <Button variant="primary" onClick={handleSaveTask}>Save Task</Button>
+          </Modal.Footer>
+        </Modal>
 
-      {/* Edit Task Modal */}
-      {currentTask && (
+        {/* Edit Task Modal */}
         <Modal show={showEditModal} onHide={handleCloseEditModal}>
           <Modal.Header closeButton>
             <Modal.Title>Edit Task</Modal.Title>
@@ -229,55 +248,49 @@ function Dashboard() {
             <Form>
               <Form.Group controlId="editTaskTitle">
                 <Form.Label>Title</Form.Label>
-                <Form.Control
-                  type="text"
-                  name="title"
-                  value={currentTask.title}
-                  onChange={(e) => setCurrentTask({ ...currentTask, title: e.target.value })}
-                />
+                <Form.Control type="text" name="title" value={currentTask?.title || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, title: e.target.value }))} />
               </Form.Group>
-              <Form.Group controlId="editTaskDescription" className="mt-3">
+              <Form.Group controlId="editTaskDescription" className="mt-2">
                 <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  name="description"
-                  value={currentTask.description}
-                  onChange={(e) => setCurrentTask({ ...currentTask, description: e.target.value })}
-                />
+                <Form.Control as="textarea" rows={3} name="description" value={currentTask?.description || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, description: e.target.value }))} />
               </Form.Group>
             </Form>
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseEditModal}>
-              Close
-            </Button>
-            <Button variant="primary" onClick={handleUpdateTask}>
-              Save Changes
-            </Button>
+            <Button variant="secondary" onClick={handleCloseEditModal}>Close</Button>
+            <Button variant="primary" onClick={handleUpdateTask}>Update Task</Button>
           </Modal.Footer>
         </Modal>
-      )}
 
-      {/* View Task Details Modal */}
-      {currentTask && (
+        {/* View Task Modal */}
         <Modal show={showViewModal} onHide={handleCloseViewModal}>
           <Modal.Header closeButton>
             <Modal.Title>Task Details</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <h5>{currentTask.title}</h5>
-            <p>{currentTask.description}</p>
-            <p><small>Created at: {currentTask.createdAt}</small></p>
+            <h5>{currentTask?.title}</h5>
+            <p>{currentTask?.description}</p>
+            <p><strong>Status:</strong> {currentTask?.status_id === 1 ? 'TODO' : currentTask?.status_id === 2 ? 'IN PROGRESS' : 'DONE'}</p>
           </Modal.Body>
           <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseViewModal}>
-              Close
-            </Button>
+            <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
           </Modal.Footer>
         </Modal>
-      )}
-    </Container>
+
+        {/* Delete Confirmation Modal */}
+        <Modal show={showDeleteModal} onHide={handleCloseDeleteModal}>
+          <Modal.Header closeButton>
+            <Modal.Title>Confirm Deletion</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            Are you sure you want to delete the task "{taskToDelete?.title}"?
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseDeleteModal}>Cancel</Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
+          </Modal.Footer>
+        </Modal>
+      </Container>
   );
 }
 
