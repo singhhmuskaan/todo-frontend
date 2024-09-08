@@ -3,18 +3,27 @@ import { Container, Row, Col, Card, Button, Form, Modal } from 'react-bootstrap'
 import axios from 'axios';
 
 // Reusable Task Card Component
-function TaskCard({ task, status }) {
+function TaskCard({ task, onEdit, onView }) {
+  const createdAtDate = new Date(task.created_at);
+
+   // Format the date in YYYY/MM/DD
+   const formattedDate = createdAtDate.toLocaleDateString('en-GB').split('/').reverse().join('/');
+
+   // Convert time to IST (Indian Standard Time)
+   const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Kolkata' };
+   const formattedTime = createdAtDate.toLocaleTimeString('en-US', options);
+
   return (
     <Card className="mb-3 shadow-sm">
       <Card.Body>
         <Card.Title>{task.title}</Card.Title>
         <Card.Text>{task.description}</Card.Text>
         <Card.Text>
-          <small className="text-muted">Created at {task.createdAt}</small>
+          <small className="text-muted">Created at {formattedDate} {formattedTime}</small>
         </Card.Text>
         <Button variant="danger" className="me-2">Delete</Button>
-        <Button variant="primary" className="me-2">Edit</Button>
-        <Button variant="secondary">View Details</Button>
+        <Button variant="primary" className="me-2" onClick={() => onEdit(task)}>Edit</Button>
+        <Button variant="secondary" onClick={() => onView(task)}>View Details</Button>
       </Card.Body>
     </Card>
   );
@@ -22,7 +31,10 @@ function TaskCard({ task, status }) {
 
 function Dashboard() {
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', description: '' });
+  const [currentTask, setCurrentTask] = useState(null); // For edit and view modals
   const [tasks, setTasks] = useState({ todo: [], inProgress: [], done: [] });
 
   // Retrieve token from local storage
@@ -83,9 +95,47 @@ function Dashboard() {
 
       setTasks(updatedTasks);
       handleCloseModal();
-
     } catch (error) {
       console.error('Error creating task:', error);
+    }
+  };
+
+  const handleEditTask = (task) => {
+    setCurrentTask(task);
+    setShowEditModal(true);
+  };
+
+  const handleViewTask = (task) => {
+    setCurrentTask(task);
+    setShowViewModal(true);
+  };
+
+  const handleCloseEditModal = () => setShowEditModal(false);
+  const handleCloseViewModal = () => setShowViewModal(false);
+
+  const handleUpdateTask = async () => {
+    try {
+      const response = await axios.put(`http://localhost:8080/api/tasks/${currentTask.id}`, currentTask, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const updatedTask = response.data;
+
+      // Update the tasks list
+      const updatedTasks = { ...tasks };
+      if (updatedTask.status === 1) {
+        updatedTasks.todo = updatedTasks.todo.map(task => task.id === updatedTask.id ? updatedTask : task);
+      } else if (updatedTask.status === 2) {
+        updatedTasks.inProgress = updatedTasks.inProgress.map(task => task.id === updatedTask.id ? updatedTask : task);
+      } else if (updatedTask.status === 3) {
+        updatedTasks.done = updatedTasks.done.map(task => task.id === updatedTask.id ? updatedTask : task);
+      }
+
+      setTasks(updatedTasks);
+      handleCloseEditModal();
+    } catch (error) {
+      console.error('Error updating task:', error);
     }
   };
 
@@ -108,7 +158,7 @@ function Dashboard() {
         <Col md={4}>
           <h5 className="mb-4">TODO</h5>
           {tasks.todo.map(task => (
-            <TaskCard key={task.id} task={task} status="TODO" />
+            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
           ))}
         </Col>
 
@@ -116,7 +166,7 @@ function Dashboard() {
         <Col md={4}>
           <h5 className="mb-4">IN PROGRESS</h5>
           {tasks.inProgress.map(task => (
-            <TaskCard key={task.id} task={task} status="IN PROGRESS" />
+            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
           ))}
         </Col>
 
@@ -124,7 +174,7 @@ function Dashboard() {
         <Col md={4}>
           <h5 className="mb-4">DONE</h5>
           {tasks.done.map(task => (
-            <TaskCard key={task.id} task={task} status="DONE" />
+            <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} />
           ))}
         </Col>
       </Row>
@@ -168,6 +218,65 @@ function Dashboard() {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Edit Task Modal */}
+      {currentTask && (
+        <Modal show={showEditModal} onHide={handleCloseEditModal}>
+          <Modal.Header closeButton>
+            <Modal.Title>Edit Task</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Form.Group controlId="editTaskTitle">
+                <Form.Label>Title</Form.Label>
+                <Form.Control
+                  type="text"
+                  name="title"
+                  value={currentTask.title}
+                  onChange={(e) => setCurrentTask({ ...currentTask, title: e.target.value })}
+                />
+              </Form.Group>
+              <Form.Group controlId="editTaskDescription" className="mt-3">
+                <Form.Label>Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="description"
+                  value={currentTask.description}
+                  onChange={(e) => setCurrentTask({ ...currentTask, description: e.target.value })}
+                />
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseEditModal}>
+              Close
+            </Button>
+            <Button variant="primary" onClick={handleUpdateTask}>
+              Save Changes
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
+
+      {/* View Task Details Modal */}
+      {currentTask && (
+        <Modal show={showViewModal} onHide={handleCloseViewModal}>
+          <Modal.Header closeButton>
+            <Modal.Title>Task Details</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <h5>{currentTask.title}</h5>
+            <p>{currentTask.description}</p>
+            <p><small>Created at: {currentTask.createdAt}</small></p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCloseViewModal}>
+              Close
+            </Button>
+          </Modal.Footer>
+        </Modal>
+      )}
     </Container>
   );
 }
