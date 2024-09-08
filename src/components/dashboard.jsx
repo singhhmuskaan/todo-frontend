@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Form, Modal } from 'react-bootstrap';
 import axios from 'axios';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 // Reusable Task Card Component
-function TaskCard({ task, onEdit, onView, onDelete }) {
+function TaskCard({ task, index, onEdit, onView, onDelete }) {
   const createdAtDate = new Date(task.created_at);
 
   // Format the date in YYYY/MM/DD
@@ -14,18 +15,27 @@ function TaskCard({ task, onEdit, onView, onDelete }) {
   const formattedTime = createdAtDate.toLocaleTimeString('en-US', options);
 
   return (
-      <Card className="mb-3 shadow-sm">
-        <Card.Body>
-          <Card.Title>{task.title}</Card.Title>
-          <Card.Text>{task.description}</Card.Text>
-          <Card.Text>
-            <small className="text-muted">Created at {formattedDate} {formattedTime}</small>
-          </Card.Text>
-          <Button variant="danger" className="me-2" onClick={() => onDelete(task)}>Delete</Button>
-          <Button variant="primary" className="me-2" onClick={() => onEdit(task)}>Edit</Button>
-          <Button variant="secondary" onClick={() => onView(task)}>View Details</Button>
-        </Card.Body>
-      </Card>
+      <Draggable draggableId={task.id.toString()} index={index}>
+        {(provided) => (
+            <Card
+                className="mb-3 shadow-sm"
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+            >
+              <Card.Body>
+                <Card.Title>{task.title}</Card.Title>
+                <Card.Text>{task.description}</Card.Text>
+                <Card.Text>
+                  <small className="text-muted">Created at {formattedDate} {formattedTime}</small>
+                </Card.Text>
+                <Button variant="danger" className="me-2" onClick={() => onDelete(task)}>Delete</Button>
+                <Button variant="primary" className="me-2" onClick={() => onEdit(task)}>Edit</Button>
+                <Button variant="secondary" onClick={() => onView(task)}>View Details</Button>
+              </Card.Body>
+            </Card>
+        )}
+      </Draggable>
   );
 }
 
@@ -177,120 +187,190 @@ function Dashboard() {
     setShowDeleteModal(false);
   };
 
+  const onDragEnd = async (result) => {
+    const { source, destination } = result;
+
+    if (!destination) return; // Dropped outside the list
+
+    const { droppableId: sourceId } = source;
+    const { droppableId: destinationId } = destination;
+
+    if (sourceId === destinationId) return; // No change in status
+
+    // Find and remove the dragged task from the source list
+    const draggedTask = tasks[sourceId].find(task => task.id === parseInt(result.draggableId));
+    const updatedTasks = {
+      ...tasks,
+      [sourceId]: tasks[sourceId].filter(task => task.id !== parseInt(result.draggableId)),
+    };
+
+    // Add the task to the destination list
+    updatedTasks[destinationId] = [...updatedTasks[destinationId], draggedTask];
+
+    // Update the task status in the backend
+    try {
+      await axios.put(`http://localhost:8080/api/tasks/${draggedTask.id}`, { ...draggedTask, status_id: destinationId === 'todo' ? 1 : destinationId === 'inProgress' ? 2 : 3 }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      setTasks(updatedTasks);
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
+  };
+
   return (
-      <Container fluid>
-        <Row className="mb-4">
-          <Col>
-            <Button variant="primary" className="mb-2" onClick={handleShowModal}>Add Task</Button>
-            <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" />
-          </Col>
-          <Col className="text-end">
-            <Form.Select className="d-inline-block w-auto">
-              <option value="recent">Sort By: Recent</option>
-              <option value="oldest">Sort By: Oldest</option>
-            </Form.Select>
-          </Col>
-        </Row>
-        <Row>
-          <Col md={4}>
-            <h5 className="mb-4">TODO</h5>
-            {tasks.todo.map(task => (
-                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
-            ))}
-          </Col>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Container>
+          <Row className="mb-3">
+            <Col>
+              <Button variant="primary" className="mb-2" onClick={handleShowModal}>Add Task</Button>
+              <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" />
+            </Col>
+            <Col className="text-end">
+              <Form.Select className="d-inline-block w-auto">
+                <option value="recent">Sort By: Recent</option>
+                <option value="oldest">Sort By: Oldest</option>
+              </Form.Select>
+            </Col>
+          </Row>
 
-          {/* IN PROGRESS Column */}
-          <Col md={4}>
-            <h5 className="mb-4">IN PROGRESS</h5>
-            {tasks.inProgress.map(task => (
-                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
-            ))}
-          </Col>
+          <Row>
+            <Droppable droppableId="todo">
+              {(provided) => (
+                  <Col ref={provided.innerRef} {...provided.droppableProps} md={4}>
+                    <h4>To Do</h4>
+                    {tasks.todo.map((task, index) => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            index={index}
+                            onEdit={handleEditTask}
+                            onView={handleViewTask}
+                            onDelete={handleDeleteTask}
+                        />
+                    ))}
+                    {provided.placeholder}
+                  </Col>
+              )}
+            </Droppable>
 
-          {/* DONE Column */}
-          <Col md={4}>
-            <h5 className="mb-4">DONE</h5>
-            {tasks.done.map(task => (
-                <TaskCard key={task.id} task={task} onEdit={handleEditTask} onView={handleViewTask} onDelete={handleDeleteTask} />
-            ))}
-          </Col>
-        </Row>
+            <Droppable droppableId="inProgress">
+              {(provided) => (
+                  <Col ref={provided.innerRef} {...provided.droppableProps} md={4}>
+                    <h4>In Progress</h4>
+                    {tasks.inProgress.map((task, index) => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            index={index}
+                            onEdit={handleEditTask}
+                            onView={handleViewTask}
+                            onDelete={handleDeleteTask}
+                        />
+                    ))}
+                    {provided.placeholder}
+                  </Col>
+              )}
+            </Droppable>
 
-        {/* Add Task Modal */}
-        <Modal show={showModal} onHide={handleCloseModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>Add New Task</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Form.Group controlId="taskTitle">
-                <Form.Label>Title</Form.Label>
-                <Form.Control type="text" name="title" value={newTask.title} onChange={handleInputChange} />
-              </Form.Group>
-              <Form.Group controlId="taskDescription" className="mt-2">
-                <Form.Label>Description</Form.Label>
-                <Form.Control as="textarea" rows={3} name="description" value={newTask.description} onChange={handleInputChange} />
-              </Form.Group>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseModal}>Close</Button>
-            <Button variant="primary" onClick={handleSaveTask}>Save Task</Button>
-          </Modal.Footer>
-        </Modal>
+            <Droppable droppableId="done">
+              {(provided) => (
+                  <Col ref={provided.innerRef} {...provided.droppableProps} md={4}>
+                    <h4>Done</h4>
+                    {tasks.done.map((task, index) => (
+                        <TaskCard
+                            key={task.id}
+                            task={task}
+                            index={index}
+                            onEdit={handleEditTask}
+                            onView={handleViewTask}
+                            onDelete={handleDeleteTask}
+                        />
+                    ))}
+                    {provided.placeholder}
+                  </Col>
+              )}
+            </Droppable>
+          </Row>
 
-        {/* Edit Task Modal */}
-        <Modal show={showEditModal} onHide={handleCloseEditModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>Edit Task</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form>
-              <Form.Group controlId="editTaskTitle">
-                <Form.Label>Title</Form.Label>
-                <Form.Control type="text" name="title" value={currentTask?.title || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, title: e.target.value }))} />
-              </Form.Group>
-              <Form.Group controlId="editTaskDescription" className="mt-2">
-                <Form.Label>Description</Form.Label>
-                <Form.Control as="textarea" rows={3} name="description" value={currentTask?.description || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, description: e.target.value }))} />
-              </Form.Group>
-            </Form>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseEditModal}>Close</Button>
-            <Button variant="primary" onClick={handleUpdateTask}>Update Task</Button>
-          </Modal.Footer>
-        </Modal>
+          {/* Add Task Modal */}
+          <Modal show={showModal} onHide={handleCloseModal}>
+            <Modal.Header closeButton>
+              <Modal.Title>Add New Task</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form>
+                <Form.Group controlId="taskTitle">
+                  <Form.Label>Title</Form.Label>
+                  <Form.Control type="text" name="title" value={newTask.title} onChange={handleInputChange} />
+                </Form.Group>
+                <Form.Group controlId="taskDescription" className="mt-2">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control as="textarea" rows={3} name="description" value={newTask.description} onChange={handleInputChange} />
+                </Form.Group>
+              </Form>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseModal}>Close</Button>
+              <Button variant="primary" onClick={handleSaveTask}>Save Task</Button>
+            </Modal.Footer>
+          </Modal>
 
-        {/* View Task Modal */}
-        <Modal show={showViewModal} onHide={handleCloseViewModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>Task Details</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <h5>{currentTask?.title}</h5>
-            <p>{currentTask?.description}</p>
-            <p><strong>Status:</strong> {currentTask?.status_id === 1 ? 'TODO' : currentTask?.status_id === 2 ? 'IN PROGRESS' : 'DONE'}</p>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
-          </Modal.Footer>
-        </Modal>
+          {/* Edit Task Modal */}
+          <Modal show={showEditModal} onHide={handleCloseEditModal}>
+            <Modal.Header closeButton>
+              <Modal.Title>Edit Task</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <Form>
+                <Form.Group controlId="editTaskTitle">
+                  <Form.Label>Title</Form.Label>
+                  <Form.Control type="text" name="title" value={currentTask?.title || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, title: e.target.value }))} />
+                </Form.Group>
+                <Form.Group controlId="editTaskDescription" className="mt-2">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control as="textarea" rows={3} name="description" value={currentTask?.description || ''} onChange={(e) => setCurrentTask(prev => ({ ...prev, description: e.target.value }))} />
+                </Form.Group>
+              </Form>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseEditModal}>Close</Button>
+              <Button variant="primary" onClick={handleUpdateTask}>Update Task</Button>
+            </Modal.Footer>
+          </Modal>
 
-        {/* Delete Confirmation Modal */}
-        <Modal show={showDeleteModal} onHide={handleCloseDeleteModal}>
-          <Modal.Header closeButton>
-            <Modal.Title>Confirm Deletion</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            Are you sure you want to delete the task "{taskToDelete?.title}"?
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseDeleteModal}>Cancel</Button>
-            <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
-          </Modal.Footer>
-        </Modal>
-      </Container>
+          {/* View Task Modal */}
+          <Modal show={showViewModal} onHide={handleCloseViewModal}>
+            <Modal.Header closeButton>
+              <Modal.Title>Task Details</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <h5>{currentTask?.title}</h5>
+              <p>{currentTask?.description}</p>
+              <p><strong>Status:</strong> {currentTask?.status_id === 1 ? 'TODO' : currentTask?.status_id === 2 ? 'IN PROGRESS' : 'DONE'}</p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseViewModal}>Close</Button>
+            </Modal.Footer>
+          </Modal>
+
+          {/* Delete Confirmation Modal */}
+          <Modal show={showDeleteModal} onHide={handleCloseDeleteModal}>
+            <Modal.Header closeButton>
+              <Modal.Title>Confirm Deletion</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              Are you sure you want to delete the task "{taskToDelete?.title}"?
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="secondary" onClick={handleCloseDeleteModal}>Cancel</Button>
+              <Button variant="danger" onClick={handleConfirmDelete}>Delete</Button>
+            </Modal.Footer>
+          </Modal>
+        </Container>
+      </DragDropContext>
   );
 }
 
