@@ -47,7 +47,10 @@ function Dashboard() {
   const [newTask, setNewTask] = useState({ title: '', description: '' });
   const [currentTask, setCurrentTask] = useState(null); // For edit and view modals
   const [tasks, setTasks] = useState({ todo: [], inProgress: [], done: [] });
+  const [originalTasks, setOriginalTasks] = useState({ todo: [], inProgress: [], done: [] });
+  const [searchTerm, setSearchTerm] = useState('');
   const [taskToDelete, setTaskToDelete] = useState(null); // For delete confirmation modal
+  const [sorting, setSorting] = useState('recent');
 
   // Retrieve token from local storage
   const token = localStorage.getItem('token');
@@ -69,7 +72,7 @@ function Dashboard() {
           done: allTasks.filter(task => task.status_id === 3)
         };
 
-        setTasks(categorizedTasks);
+        setAllTasks(categorizedTasks);
       } catch (error) {
         console.error('Error fetching tasks:', error);
       }
@@ -78,6 +81,29 @@ function Dashboard() {
     fetchTasks();
   }, [token]);
 
+  useEffect(() => {
+    const searched = {
+      todo: originalTasks.todo.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase())),
+      inProgress: originalTasks.inProgress.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase())),
+      done: originalTasks.done.filter(task => task.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    };
+    setTasks(searched);
+  }, [originalTasks.done, originalTasks.inProgress, originalTasks.todo, searchTerm]);
+
+  useEffect(() => {
+    const sortedTasks = {
+      todo: originalTasks.todo.sort((a, b) => sorting === 'recent' ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at)),
+      inProgress: originalTasks.inProgress.sort((a, b) => sorting === 'recent' ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at)),
+      done: originalTasks.done.sort((a, b) => sorting === 'recent' ? new Date(b.created_at) - new Date(a.created_at) : new Date(a.created_at) - new Date(b.created_at)),
+    };
+    setTasks(sortedTasks);
+  }, [originalTasks.done, originalTasks.inProgress, originalTasks.todo, sorting]);
+
+  function setAllTasks(tasks) {
+    setTasks(tasks);
+    setOriginalTasks(tasks);
+  }
+
   const handleShowModal = () => setShowModal(true);
   const handleCloseModal = () => setShowModal(false);
 
@@ -85,6 +111,14 @@ function Dashboard() {
     const { name, value } = e.target;
     setNewTask(prevState => ({ ...prevState, [name]: value }));
   };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  }
+
+  const handleSort = (e) => {
+    setSorting(e.target.value);
+  }
 
   const handleSaveTask = async () => {
     try {
@@ -105,7 +139,7 @@ function Dashboard() {
         updatedTasks.done = [createdTask, ...updatedTasks.done];
       }
 
-      setTasks(updatedTasks);
+      setAllTasks(updatedTasks);
       handleCloseModal();
     } catch (error) {
       console.error('Error creating task:', error);
@@ -144,7 +178,7 @@ function Dashboard() {
         updatedTasks.done = updatedTasks.done.map(task => task.id === updatedTask.id ? updatedTask : task);
       }
 
-      setTasks(updatedTasks);
+      setAllTasks(updatedTasks);
       handleCloseEditModal();
     } catch (error) {
       console.error('Error updating task:', error);
@@ -174,7 +208,7 @@ function Dashboard() {
         updatedTasks.done = updatedTasks.done.filter(task => task.id !== taskToDelete.id);
       }
 
-      setTasks(updatedTasks);
+      setAllTasks(updatedTasks);
       setTaskToDelete(null);
       setShowDeleteModal(false);
     } catch (error) {
@@ -214,7 +248,7 @@ function Dashboard() {
           Authorization: `Bearer ${token}`
         }
       });
-      setTasks(updatedTasks);
+      setAllTasks(updatedTasks);
     } catch (error) {
       console.error('Error updating task status:', error);
     }
@@ -226,10 +260,10 @@ function Dashboard() {
           <Row className="mb-3">
             <Col>
               <Button variant="primary" className="mb-2" onClick={handleShowModal}>Add Task</Button>
-              <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" />
+              <Form.Control type="text" placeholder="Search..." className="d-inline-block w-auto ms-3" onChange={handleSearch} />
             </Col>
             <Col className="text-end">
-              <Form.Select className="d-inline-block w-auto">
+              <Form.Select className="d-inline-block w-auto" onChange={handleSort}>
                 <option value="recent">Sort By: Recent</option>
                 <option value="oldest">Sort By: Oldest</option>
               </Form.Select>
