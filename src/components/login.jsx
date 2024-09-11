@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Container, Form, Button, Row, Col, Card } from 'react-bootstrap';
 import {GoogleLogin} from "@react-oauth/google";
 import {useGoogleSuccess} from "../auth/google/use-google-auth";
-import config from './config';
+import config from '../config';
 
 
 function Login() {

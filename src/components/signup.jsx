@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import {useGoogleSuccess} from "../auth/google/use-google-auth";
-import config from './config';
+import config from '../config';
 
 function Signup() {
     const {responseMessage, errorMessage} = useGoogleSuccess();
