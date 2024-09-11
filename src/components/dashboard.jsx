@@ -134,11 +134,11 @@ function Dashboard() {
       // Assuming your API returns the created task with a status
       const updatedTasks = { ...tasks };
       if (createdTask.status_id === 1) {
-        updatedTasks.todo = [createdTask, ...updatedTasks.todo];
+        updatedTasks.todo = [{...createdTask, created_at: new Date()}, ...updatedTasks.todo];
       } else if (createdTask.status_id === 2) {
-        updatedTasks.inProgress = [createdTask, ...updatedTasks.inProgress];
+        updatedTasks.inProgress = [{...createdTask, created_at: new Date()}, ...updatedTasks.inProgress];
       } else if (createdTask.status_id === 3) {
-        updatedTasks.done = [createdTask, ...updatedTasks.done];
+        updatedTasks.done = [{...createdTask, created_at: new Date()}, ...updatedTasks.done];
       }
 
       setAllTasks(updatedTasks);
@@ -163,7 +163,7 @@ function Dashboard() {
 
   const handleUpdateTask = async () => {
     try {
-      const response = await axios.put(`${config.apiUrl}/${currentTask.id}`, currentTask, {
+      const response = await axios.put(`${config.apiUrl}/tasks/${currentTask.id}`, currentTask, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -194,7 +194,7 @@ function Dashboard() {
 
   const handleConfirmDelete = async () => {
     try {
-      await axios.delete(`${config.apiUrl}/${taskToDelete.id}`, {
+      await axios.delete(`${config.apiUrl}/tasks/${taskToDelete.id}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -245,7 +245,7 @@ function Dashboard() {
 
     // Update the task status in the backend
     try {
-      await axios.put(`${config.apiUrl}/${draggedTask.id}`, { ...draggedTask, status_id: destinationId === 'todo' ? 1 : destinationId === 'inProgress' ? 2 : 3 }, {
+      await axios.put(`${config.apiUrl}/tasks/${draggedTask.id}`, { ...draggedTask, status_id: destinationId === 'todo' ? 1 : destinationId === 'inProgress' ? 2 : 3 }, {
         headers: {
           Authorization: `Bearer ${token}`
         }
