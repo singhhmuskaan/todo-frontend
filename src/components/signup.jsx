@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import {useGoogleSuccess} from "../auth/google/use-google-auth";
-
+import config from './config';
 
 function Signup() {
     const {responseMessage, errorMessage} = useGoogleSuccess();
@@ -37,7 +37,7 @@ function Signup() {
     const name = `${firstName} ${lastName}`;
 
     try {
-      const response = await axios.post('http://localhost:8080/api/register', {
+      const response = await axios.post(`${config.apiUrl}/register`, {
         name,
         email,
         password
