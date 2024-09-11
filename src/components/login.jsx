@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Container, Form, Button, Row, Col, Card } from 'react-bootstrap';
 import {GoogleLogin} from "@react-oauth/google";
 import {useGoogleSuccess} from "../auth/google/use-google-auth";
+import config from '../config';
+
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -21,7 +23,7 @@ function Login() {
     };
 
     try {
-      const response = await fetch('http://localhost:8080/api/login', {
+      const response = await fetch(`${config.apiUrl}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 import { jwtDecode } from 'jwt-decode';
 import {useNavigate} from "react-router-dom";
 import axios from "axios";
+import config from '../../config'; 
 
 export const useGoogleSuccess = () => {
     // Handle Google Login Success
@@ -13,7 +14,7 @@ export const useGoogleSuccess = () => {
             const { name, email } = decoded; // Extract the name and email from the decoded token
 
             // Call your backend API to handle Google signup
-            const apiResponse = await axios.post('http://localhost:8080/api/google-signup', {
+            const apiResponse = await axios.post(`${config.apiUrl}/google-signup`, {
                 name,
                 email,
                 googleToken: response.credential // Pass the Google token

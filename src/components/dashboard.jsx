@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Form, Modal } from 'react-bootstrap';
 import axios from 'axios';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import config from '../config';
+
 
 // Reusable Task Card Component
 function TaskCard({ task, index, onEdit, onView, onDelete }) {
@@ -58,7 +60,7 @@ function Dashboard() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/api/tasks', {
+        const response = await axios.get(`${config.apiUrl}/tasks`, {
           headers: {
             Authorization: `Bearer ${token}`
           }
@@ -122,7 +124,7 @@ function Dashboard() {
 
   const handleSaveTask = async () => {
     try {
-      const response = await axios.post('http://localhost:8080/api/tasks', newTask, {
+      const response = await axios.post(`${config.apiUrl}/tasks`, newTask, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -161,7 +163,7 @@ function Dashboard() {
 
   const handleUpdateTask = async () => {
     try {
-      const response = await axios.put(`http://localhost:8080/api/tasks/${currentTask.id}`, currentTask, {
+      const response = await axios.put(`${config.apiUrl}/${currentTask.id}`, currentTask, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -192,7 +194,7 @@ function Dashboard() {
 
   const handleConfirmDelete = async () => {
     try {
-      await axios.delete(`http://localhost:8080/api/tasks/${taskToDelete.id}`, {
+      await axios.delete(`${config.apiUrl}/${taskToDelete.id}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -243,7 +245,7 @@ function Dashboard() {
 
     // Update the task status in the backend
     try {
-      await axios.put(`http://localhost:8080/api/tasks/${draggedTask.id}`, { ...draggedTask, status_id: destinationId === 'todo' ? 1 : destinationId === 'inProgress' ? 2 : 3 }, {
+      await axios.put(`${config.apiUrl}/${draggedTask.id}`, { ...draggedTask, status_id: destinationId === 'todo' ? 1 : destinationId === 'inProgress' ? 2 : 3 }, {
         headers: {
           Authorization: `Bearer ${token}`
         }
